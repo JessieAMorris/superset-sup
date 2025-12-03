@@ -99,7 +99,8 @@ def show_config():
         ]
 
         panel_content = "\n".join(info_lines)
-        console.print(Panel(panel_content, title="Configuration", border_style=COLORS.success))
+        console.print(Panel(panel_content, title="Configuration",
+                      border_style=COLORS.success))
 
         # Show config file locations
         from sup.config.paths import get_global_config_file, get_project_state_file
@@ -254,19 +255,106 @@ def auth_setup():
     Guides through Preset API token setup or Superset instance configuration.
     """
     from sup.auth.preset import test_auth_credentials
-    from sup.config.settings import SupContext
+    from sup.auth.standalone import test_superset_auth
+    from sup.config.settings import SupContext, SupersetInstanceConfig
 
-    console.print(f"{EMOJIS['lock']} Authentication Setup", style=RICH_STYLES["header"])
-    console.print(
-        "Let's set up your Preset credentials for seamless access to your workspaces.",
-        style=RICH_STYLES["info"],
-    )
+    console.print(f"{EMOJIS['lock']} Authentication Setup",
+                  style=RICH_STYLES["header"])
+
+    console.print("Select authentication type:", style=RICH_STYLES["info"])
+    console.print("1. [bold]Preset.io[/] (Managed Superset)")
+    console.print("2. [bold]Standalone Superset[/] (Self-hosted)")
     console.print()
+
+    auth_type = input("Choose an option [1-2] (default: 1): ").strip() or "1"
 
     # Get current context
     ctx = SupContext()
 
-    # Check if credentials already exist
+    if auth_type == "2":
+        # Standalone Superset Setup
+        console.print()
+        console.print(
+            f"{EMOJIS['config']} Standalone Superset Configuration", style=RICH_STYLES["header"])
+
+        instance_name = input(
+            "Instance Name (default: 'default'): ").strip() or "default"
+
+        # Check existing
+        if instance_name in ctx.global_config.superset_instances:
+            console.print(f"{EMOJIS['info']} Updating existing instance '{
+                          instance_name}'", style=RICH_STYLES["info"])
+
+        instance_url = input(
+            "Enter Superset Instance URL (e.g., https://superset.example.com): ").strip()
+        if not instance_url:
+            console.print(
+                f"{EMOJIS['error']} Instance URL is required", style=RICH_STYLES["error"])
+            return
+
+        username = input("Enter Username: ").strip()
+        if not username:
+            console.print(
+                f"{EMOJIS['error']} Username is required", style=RICH_STYLES["error"])
+            return
+
+        password = input("Enter Password: ").strip()
+        if not password:
+            console.print(
+                f"{EMOJIS['error']} Password is required", style=RICH_STYLES["error"])
+            return
+
+        # Test connection
+        console.print(
+            f"{EMOJIS['loading']} Testing connection...", style=RICH_STYLES["info"])
+        if test_superset_auth(instance_url, username, password):
+            console.print(
+                f"{EMOJIS['success']} Connection successful!", style=RICH_STYLES["success"])
+
+            # Save configuration
+            console.print()
+            console.print(
+                "How would you like to store these credentials?", style=RICH_STYLES["header"])
+            console.print(
+                "1. [bold]Global config[/] (~/.sup/config.yml) - recommended for personal use")
+            console.print(
+                "2. [bold]Environment variables[/] - more secure, great for CI/CD")
+            console.print("3. [bold]Skip storage[/]")
+
+            choice = input("Choose an option [1-3]: ").strip()
+
+            if choice == "1":
+                new_instance = SupersetInstanceConfig(
+                    url=instance_url,
+                    username=username,
+                    password=password,
+                    auth_method="username_password"
+                )
+                ctx.global_config.superset_instances[instance_name] = new_instance
+                ctx.global_config.current_superset_instance = instance_name
+                ctx.global_config.save_to_file()
+                console.print(
+                    f"{EMOJIS['success']} Credentials saved to ~/.sup/config.yml", style=RICH_STYLES["success"])
+
+            elif choice == "2":
+                console.print("Add these to your shell profile:",
+                              style=RICH_STYLES["info"])
+                console.print(f"export SUP_SUPERSET_INSTANCE_URL='{
+                              instance_url}'", style=RICH_STYLES["data"])
+                console.print(f"export SUP_SUPERSET_USERNAME='{
+                              username}'", style=RICH_STYLES["data"])
+                console.print(f"export SUP_SUPERSET_PASSWORD='{
+                              password}'", style=RICH_STYLES["data"])
+
+            console.print()
+            console.print(
+                f"{EMOJIS['rocket']} Setup complete!", style=RICH_STYLES["success"])
+        else:
+            console.print(
+                f"{EMOJIS['error']} Connection failed. Please check your credentials.", style=RICH_STYLES["error"])
+        return
+
+    # Preset Setup (Existing Logic)
     existing_token, existing_secret = ctx.get_preset_credentials()
     if existing_token and existing_secret:
         console.print(
@@ -281,7 +369,8 @@ def auth_setup():
                 style=RICH_STYLES["success"],
             )
 
-            update = input("Do you want to update them anyway? [y/N]: ").strip().lower()
+            update = input(
+                "Do you want to update them anyway? [y/N]: ").strip().lower()
             if update not in ("y", "yes"):
                 console.print(
                     "Authentication setup cancelled.",
@@ -378,7 +467,8 @@ def auth_setup():
                 "You can set credentials manually with these environment variables:",
                 style=RICH_STYLES["info"],
             )
-            console.print("SUP_PRESET_API_TOKEN=your_token", style=RICH_STYLES["data"])
+            console.print("SUP_PRESET_API_TOKEN=your_token",
+                          style=RICH_STYLES["data"])
             console.print(
                 "SUP_PRESET_API_SECRET=your_secret",
                 style=RICH_STYLES["data"],
@@ -392,7 +482,8 @@ def auth_setup():
 
     else:
         console.print(
-            f"{EMOJIS['error']} Invalid credentials. Please check your API token and secret.",
+            f"{EMOJIS['error']
+               } Invalid credentials. Please check your API token and secret.",
             style=RICH_STYLES["error"],
         )
         console.print(
@@ -415,7 +506,8 @@ def init_project():
 
     # TODO: Implement project initialization
     console.print(
-        f"{EMOJIS['success']} Project initialized! Use 'sup config show' to see settings.",
+        f"{EMOJIS['success']
+           } Project initialized! Use 'sup config show' to see settings.",
         style=RICH_STYLES["success"],
     )
 
@@ -431,7 +523,8 @@ def show_env_vars():
     from sup.config.paths import get_global_config_file, get_project_state_file
     from sup.output.styles import COLORS
 
-    console.print(f"{EMOJIS['config']} sup Configuration Guide", style=f"bold {COLORS.primary}")
+    console.print(f"{EMOJIS['config']} sup Configuration Guide", style=f"bold {
+                  COLORS.primary}")
     console.print(
         "sup can be configured via environment variables OR config files:",
         style=RICH_STYLES["info"],
@@ -439,12 +532,16 @@ def show_env_vars():
     console.print()
 
     # Show config file locations
-    console.print("📁 Configuration File Locations:", style=f"bold {COLORS.primary}")
-    console.print(f"  Global config: {get_global_config_file()}", style="white")
-    console.print(f"  Project state: {get_project_state_file()}", style="white")
+    console.print("📁 Configuration File Locations:",
+                  style=f"bold {COLORS.primary}")
+    console.print(f"  Global config: {
+                  get_global_config_file()}", style="white")
+    console.print(f"  Project state: {
+                  get_project_state_file()}", style="white")
     console.print()
 
-    console.print("⚙️ Environment Variables (take precedence):", style=f"bold {COLORS.primary}")
+    console.print("⚙️ Environment Variables (take precedence):",
+                  style=f"bold {COLORS.primary}")
 
     env_vars = [
         ("SUP_PRESET_API_TOKEN", "Preset API token for authentication"),
@@ -481,13 +578,15 @@ def show_env_vars():
 
     # Show examples
     console.print("Examples:", style=f"bold {COLORS.primary}")
-    console.print("  export SUP_PRESET_API_TOKEN=your_token_here", style="white")
+    console.print(
+        "  export SUP_PRESET_API_TOKEN=your_token_here", style="white")
     console.print("  export SUP_WORKSPACE_ID=123", style="white")
     console.print("  export SUP_ASSETS_FOLDER=/path/to/assets", style="white")
     console.print("  export SUP_OUTPUT_FORMAT=json", style="white")
     console.print()
 
-    console.print("Perfect for CI/CD and automation:", style=f"bold {COLORS.primary}")
+    console.print("Perfect for CI/CD and automation:",
+                  style=f"bold {COLORS.primary}")
     console.print(
         "  docker run -e SUP_PRESET_API_TOKEN=token my-image sup sql 'SELECT 1'",
         style="white",

@@ -6,11 +6,15 @@ Provides database and SQL execution functionality.
 
 from typing import Any, Dict, List, Optional
 
+from yarl import URL
 # Removed: from rich.console import Console
 from rich.table import Table
 
 from preset_cli.api.clients.superset import SupersetClient
+from preset_cli.auth.main import Auth
+from preset_cli.auth.superset import SupersetJWTAuth
 from sup.auth.preset import SupPresetAuth
+from sup.auth.standalone import login_and_get_token
 from sup.config.settings import SupContext
 from sup.output.console import console
 from sup.output.styles import COLORS, EMOJIS, RICH_STYLES
@@ -21,7 +25,7 @@ class SupSupersetClient:
     Superset client wrapper with sup-specific functionality.
     """
 
-    def __init__(self, workspace_url: str, auth: SupPresetAuth):
+    def __init__(self, workspace_url: str, auth: Auth):
         self.workspace_url = workspace_url
         self.auth = auth
         self.client = SupersetClient(workspace_url, auth)
@@ -32,7 +36,50 @@ class SupSupersetClient:
         ctx: SupContext,
         workspace_id: Optional[int] = None,
     ) -> "SupSupersetClient":
-        """Create Superset client from sup configuration context."""
+        """
+        Create Superset client from sup configuration context.
+
+        Supports both Standalone Superset and Preset.io workspaces.
+        """
+        # 1. Check for Standalone Superset configuration first
+        standalone_config = ctx.get_current_superset_instance_config()
+
+        if standalone_config:
+            if standalone_config.auth_method == "username_password":
+                if not (standalone_config.username and standalone_config.password):
+                    raise ValueError(
+                        "Username and password required for standalone auth")
+
+                try:
+                    # Authenticate and get JWT
+                    token = login_and_get_token(
+                        standalone_config.url,
+                        standalone_config.username,
+                        standalone_config.password
+                    )
+
+                    # Use SupersetJWTAuth which handles CSRF
+                    auth = SupersetJWTAuth(token, URL(standalone_config.url))
+
+                    return cls(standalone_config.url, auth)
+                except Exception as e:
+                    console.print(
+                        f"{EMOJIS['error']} Standalone Superset authentication failed: {
+                            e}",
+                        style=RICH_STYLES["error"]
+                    )
+                    raise
+
+            # Future support for other auth methods (jwt, oauth) can go here
+            else:
+                console.print(
+                    f"{EMOJIS['warning']} Unsupported auth method: {
+                        standalone_config.auth_method}",
+                    style=RICH_STYLES["warning"]
+                )
+                # Fall through to see if Preset works? No, if configured as standalone, likely fail.
+
+        # 2. Fallback to Preset.io Workspace logic
         # Get workspace ID from context if not provided
         if workspace_id is None:
             workspace_id = ctx.get_workspace_id()
@@ -45,6 +92,10 @@ class SupSupersetClient:
             console.print(
                 "💡 Run [bold]sup workspace list[/] and [bold]sup workspace use <ID>[/]",
                 style=RICH_STYLES["info"],
+            )
+            console.print(
+                "   Or configure standalone Superset with [bold]sup config auth[/]",
+                style=RICH_STYLES["dim"],
             )
             raise ValueError("No workspace configured")
 
@@ -81,7 +132,8 @@ class SupSupersetClient:
             hostname = workspace.get("hostname")
             if not hostname:
                 console.print(
-                    f"{EMOJIS['error']} No hostname for workspace {workspace_id}",
+                    f"{EMOJIS['error']} No hostname for workspace {
+                        workspace_id}",
                     style=RICH_STYLES["error"],
                 )
                 raise ValueError(f"No hostname for workspace {workspace_id}")
@@ -122,7 +174,8 @@ class SupSupersetClient:
             return database
         except Exception as e:
             console.print(
-                f"{EMOJIS['error']} Failed to fetch database {database_id}: {e}",
+                f"{EMOJIS['error']} Failed to fetch database {
+                    database_id}: {e}",
                 style=RICH_STYLES["error"],
             )
             raise
@@ -170,7 +223,8 @@ class SupSupersetClient:
                 db_type = backend or "Unknown"
 
             # Simple status check (in real implementation, could ping the database)
-            status = "Available" if database.get("expose_in_sqllab", True) else "Hidden"
+            status = "Available" if database.get(
+                "expose_in_sqllab", True) else "Hidden"
 
             table.add_row(db_id, name, db_type, backend or "Unknown", status)
 
@@ -244,7 +298,8 @@ class SupSupersetClient:
         except Exception as e:
             if not silent:
                 console.print(
-                    f"{EMOJIS['error']} Failed to fetch dataset {dataset_id}: {e}",
+                    f"{EMOJIS['error']} Failed to fetch dataset {
+                        dataset_id}: {e}",
                     style=RICH_STYLES["error"],
                 )
             raise
@@ -291,7 +346,8 @@ class SupSupersetClient:
             charts = response.json()["result"]
 
             if not silent:
-                console.print(f"Found {len(charts)} charts", style=RICH_STYLES["dim"])
+                console.print(f"Found {len(charts)} charts",
+                              style=RICH_STYLES["dim"])
             return charts
 
         except Exception as e:
@@ -379,7 +435,8 @@ class SupSupersetClient:
         except Exception as e:
             if not silent:
                 console.print(
-                    f"{EMOJIS['error']} Failed to fetch dashboard {dashboard_id}: {e}",
+                    f"{EMOJIS['error']} Failed to fetch dashboard {
+                        dashboard_id}: {e}",
                     style=RICH_STYLES["error"],
                 )
             raise
@@ -435,7 +492,8 @@ class SupSupersetClient:
         except Exception as e:
             if not silent:
                 console.print(
-                    f"{EMOJIS['error']} Failed to fetch saved query {query_id}: {e}",
+                    f"{EMOJIS['error']} Failed to fetch saved query {
+                        query_id}: {e}",
                     style=RICH_STYLES["error"],
                 )
             raise
@@ -561,14 +619,16 @@ class SupSupersetClient:
 
             # All approaches failed
             raise ValueError(
-                f"Chart {chart_id} has no saved query context and cannot construct one. "
+                f"Chart {
+                    chart_id} has no saved query context and cannot construct one. "
                 f"Please open and save the chart in Superset to generate a query context."
             )
 
         except Exception as e:
             if not silent:
                 console.print(
-                    f"{EMOJIS['error']} Failed to get chart {result_type}: {e}",
+                    f"{EMOJIS['error']} Failed to get chart {
+                        result_type}: {e}",
                     style=RICH_STYLES["error"],
                 )
             raise
