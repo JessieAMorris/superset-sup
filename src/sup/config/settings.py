@@ -129,7 +129,9 @@ class SupGlobalConfig(BaseSettings):
     preset_api_secret: Optional[str] = None
 
     # Superset Authentication (Extensible Design)
-    superset_instances: Dict[str, SupersetInstanceConfig] = Field(default_factory=dict)
+    superset_instances: Dict[str, SupersetInstanceConfig] = Field(
+        default_factory=dict)
+    current_superset_instance: Optional[str] = None
 
     # Global preferences
     output_format: OutputFormat = OutputFormat.table
@@ -193,7 +195,8 @@ class SupProjectState(BaseSettings):
     # Current context
     current_workspace_id: Optional[int] = None
     current_workspace_url: Optional[str] = None
-    current_workspace_hostname: Optional[str] = None  # Cache hostname for efficiency
+    # Cache hostname for efficiency
+    current_workspace_hostname: Optional[str] = None
     current_database_id: Optional[int] = None
     current_team: Optional[str] = None
 
@@ -218,7 +221,8 @@ class SupProjectState(BaseSettings):
                 data = yaml.safe_load(f) or {}
             return cls(**data)
         except Exception as e:
-            print(f"Warning: Could not load project state from {state_file}: {e}")
+            print(f"Warning: Could not load project state from {
+                  state_file}: {e}")
             return cls()
 
     def save_to_file(self) -> None:
@@ -270,9 +274,34 @@ class SupContext:
 
     def get_preset_credentials(self) -> Tuple[Optional[str], Optional[str]]:
         """Get Preset API credentials."""
-        token = get_env_var("preset_api_token") or self.global_config.preset_api_token
-        secret = get_env_var("preset_api_secret") or self.global_config.preset_api_secret
+        token = get_env_var(
+            "preset_api_token") or self.global_config.preset_api_token
+        secret = get_env_var(
+            "preset_api_secret") or self.global_config.preset_api_secret
         return token, secret
+
+    def get_current_superset_instance_config(self) -> Optional[SupersetInstanceConfig]:
+        """Get configuration for the active standalone Superset instance."""
+        # Check environment variables first for a "temporary" standalone config
+        env_url = get_env_var("superset_instance_url")
+        env_username = get_env_var("superset_username")
+        env_password = get_env_var("superset_password")
+
+        if env_url:
+            # Create a temporary config object from env vars
+            return SupersetInstanceConfig(
+                url=env_url,
+                username=env_username,
+                password=env_password,
+                auth_method="username_password"
+            )
+
+        # Fallback to configured instances
+        instance_name = self.global_config.current_superset_instance
+        if instance_name and instance_name in self.global_config.superset_instances:
+            return self.global_config.superset_instances[instance_name]
+
+        return None
 
     def get_output_format(
         self,
