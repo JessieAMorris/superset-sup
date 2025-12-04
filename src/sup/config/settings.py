@@ -293,7 +293,8 @@ class SupContext:
             )
 
         # Fallback to configured instances
-        instance_name = self.global_config.current_superset_instance
+        env_instance_name = get_env_var("superset_instance")
+        instance_name = env_instance_name or self.global_config.current_superset_instance
         if instance_name and instance_name in self.global_config.superset_instances:
             return self.global_config.superset_instances[instance_name]
 
