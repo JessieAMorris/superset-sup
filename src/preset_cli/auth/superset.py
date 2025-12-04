@@ -47,13 +47,12 @@ class UsernamePasswordAuth(SupersetJWTAuth):  # pylint: disable=too-few-public-m
     def __init__(self, baseurl: URL, username: str, password: Optional[str] = None):
         super().__init__("", baseurl)
 
-        self.csrf_token: Optional[str] = None
         self.baseurl = baseurl
         self.username = username
         self.password = password
         self.token = self.auth()
 
-    def auth(self) -> None:
+    def auth(self) -> str:
         """
         Login to Superset using username/password and return access token.
         Uses /api/v1/security/login endpoint.
