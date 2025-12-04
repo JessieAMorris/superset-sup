@@ -12,9 +12,8 @@ from rich.table import Table
 
 from preset_cli.api.clients.superset import SupersetClient
 from preset_cli.auth.main import Auth
-from preset_cli.auth.superset import SupersetJWTAuth
+from preset_cli.auth.factory import create_superset_auth
 from sup.auth.preset import SupPresetAuth
-from sup.auth.standalone import login_and_get_token
 from sup.config.settings import SupContext
 from sup.output.console import console
 from sup.output.styles import COLORS, EMOJIS, RICH_STYLES
@@ -45,39 +44,8 @@ class SupSupersetClient:
         standalone_config = ctx.get_current_superset_instance_config()
 
         if standalone_config:
-            if standalone_config.auth_method == "username_password":
-                if not (standalone_config.username and standalone_config.password):
-                    raise ValueError(
-                        "Username and password required for standalone auth")
-
-                try:
-                    # Authenticate and get JWT
-                    token = login_and_get_token(
-                        standalone_config.url,
-                        standalone_config.username,
-                        standalone_config.password
-                    )
-
-                    # Use SupersetJWTAuth which handles CSRF
-                    auth = SupersetJWTAuth(token, URL(standalone_config.url))
-
-                    return cls(standalone_config.url, auth)
-                except Exception as e:
-                    console.print(
-                        f"{EMOJIS['error']} Standalone Superset authentication failed: {
-                            e}",
-                        style=RICH_STYLES["error"]
-                    )
-                    raise
-
-            # Future support for other auth methods (jwt, oauth) can go here
-            else:
-                console.print(
-                    f"{EMOJIS['warning']} Unsupported auth method: {
-                        standalone_config.auth_method}",
-                    style=RICH_STYLES["warning"]
-                )
-                # Fall through to see if Preset works? No, if configured as standalone, likely fail.
+            auth = create_superset_auth(standalone_config)
+            return cls(standalone_config.url, auth)
 
         # 2. Fallback to Preset.io Workspace logic
         # Get workspace ID from context if not provided
