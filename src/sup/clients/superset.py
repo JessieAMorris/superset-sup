@@ -4,6 +4,13 @@ Superset client wrapper for sup CLI.
 Provides database and SQL execution functionality.
 """
 
+from sup.output.styles import COLORS, EMOJIS, RICH_STYLES
+from sup.output.console import console
+from sup.config.settings import SupContext
+from sup.auth.standalone import login_and_get_token
+from sup.auth.preset import SupPresetAuth
+from preset_cli.auth.superset import SupersetJWTAuth
+from preset_cli.auth.factory import create_superset_auth
 from typing import Any, Dict, List, Optional
 
 from yarl import URL
@@ -12,11 +19,6 @@ from rich.table import Table
 
 from preset_cli.api.clients.superset import SupersetClient
 from preset_cli.auth.main import Auth
-from preset_cli.auth.factory import create_superset_auth
-from sup.auth.preset import SupPresetAuth
-from sup.config.settings import SupContext
-from sup.output.console import console
-from sup.output.styles import COLORS, EMOJIS, RICH_STYLES
 
 
 class SupSupersetClient:
