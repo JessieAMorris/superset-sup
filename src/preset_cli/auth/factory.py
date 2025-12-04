@@ -76,11 +76,7 @@ def create_superset_auth(
             "oauth_password": config.oauth_password,
         }
 
-        missing = [
-            key.replace("oauth_", "")
-            for key, value in required_fields.items()
-            if not value
-        ]
+        missing = [key.replace("oauth_", "") for key, value in required_fields.items() if not value]
 
         if missing:
             raise ValueError(

@@ -14,6 +14,7 @@ from preset_cli.auth.factory import create_superset_auth
 from typing import Any, Dict, List, Optional
 
 from yarl import URL
+
 # Removed: from rich.console import Console
 from rich.table import Table
 
@@ -102,8 +103,7 @@ class SupSupersetClient:
             hostname = workspace.get("hostname")
             if not hostname:
                 console.print(
-                    f"{EMOJIS['error']} No hostname for workspace {
-                        workspace_id}",
+                    f"{EMOJIS['error']} No hostname for workspace {workspace_id}",
                     style=RICH_STYLES["error"],
                 )
                 raise ValueError(f"No hostname for workspace {workspace_id}")
@@ -144,8 +144,7 @@ class SupSupersetClient:
             return database
         except Exception as e:
             console.print(
-                f"{EMOJIS['error']} Failed to fetch database {
-                    database_id}: {e}",
+                f"{EMOJIS['error']} Failed to fetch database {database_id}: {e}",
                 style=RICH_STYLES["error"],
             )
             raise
@@ -193,8 +192,7 @@ class SupSupersetClient:
                 db_type = backend or "Unknown"
 
             # Simple status check (in real implementation, could ping the database)
-            status = "Available" if database.get(
-                "expose_in_sqllab", True) else "Hidden"
+            status = "Available" if database.get("expose_in_sqllab", True) else "Hidden"
 
             table.add_row(db_id, name, db_type, backend or "Unknown", status)
 
@@ -268,8 +266,7 @@ class SupSupersetClient:
         except Exception as e:
             if not silent:
                 console.print(
-                    f"{EMOJIS['error']} Failed to fetch dataset {
-                        dataset_id}: {e}",
+                    f"{EMOJIS['error']} Failed to fetch dataset {dataset_id}: {e}",
                     style=RICH_STYLES["error"],
                 )
             raise
@@ -316,8 +313,7 @@ class SupSupersetClient:
             charts = response.json()["result"]
 
             if not silent:
-                console.print(f"Found {len(charts)} charts",
-                              style=RICH_STYLES["dim"])
+                console.print(f"Found {len(charts)} charts", style=RICH_STYLES["dim"])
             return charts
 
         except Exception as e:
@@ -405,8 +401,7 @@ class SupSupersetClient:
         except Exception as e:
             if not silent:
                 console.print(
-                    f"{EMOJIS['error']} Failed to fetch dashboard {
-                        dashboard_id}: {e}",
+                    f"{EMOJIS['error']} Failed to fetch dashboard {dashboard_id}: {e}",
                     style=RICH_STYLES["error"],
                 )
             raise
@@ -462,8 +457,7 @@ class SupSupersetClient:
         except Exception as e:
             if not silent:
                 console.print(
-                    f"{EMOJIS['error']} Failed to fetch saved query {
-                        query_id}: {e}",
+                    f"{EMOJIS['error']} Failed to fetch saved query {query_id}: {e}",
                     style=RICH_STYLES["error"],
                 )
             raise
@@ -589,16 +583,14 @@ class SupSupersetClient:
 
             # All approaches failed
             raise ValueError(
-                f"Chart {
-                    chart_id} has no saved query context and cannot construct one. "
+                f"Chart {chart_id} has no saved query context and cannot construct one. "
                 f"Please open and save the chart in Superset to generate a query context."
             )
 
         except Exception as e:
             if not silent:
                 console.print(
-                    f"{EMOJIS['error']} Failed to get chart {
-                        result_type}: {e}",
+                    f"{EMOJIS['error']} Failed to get chart {result_type}: {e}",
                     style=RICH_STYLES["error"],
                 )
             raise

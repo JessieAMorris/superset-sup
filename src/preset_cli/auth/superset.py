@@ -45,7 +45,7 @@ class UsernamePasswordAuth(SupersetJWTAuth):  # pylint: disable=too-few-public-m
     """
 
     def __init__(self, baseurl: URL, username: str, password: Optional[str] = None):
-        super().__init__('', baseurl)
+        super().__init__("", baseurl)
 
         self.csrf_token: Optional[str] = None
         self.baseurl = baseurl

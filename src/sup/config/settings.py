@@ -129,8 +129,7 @@ class SupGlobalConfig(BaseSettings):
     preset_api_secret: Optional[str] = None
 
     # Superset Authentication (Extensible Design)
-    superset_instances: Dict[str, SupersetInstanceConfig] = Field(
-        default_factory=dict)
+    superset_instances: Dict[str, SupersetInstanceConfig] = Field(default_factory=dict)
     current_superset_instance: Optional[str] = None
 
     # Global preferences
@@ -221,8 +220,7 @@ class SupProjectState(BaseSettings):
                 data = yaml.safe_load(f) or {}
             return cls(**data)
         except Exception as e:
-            print(f"Warning: Could not load project state from {
-                  state_file}: {e}")
+            print(f"Warning: Could not load project state from {state_file}: {e}")
             return cls()
 
     def save_to_file(self) -> None:
@@ -274,10 +272,8 @@ class SupContext:
 
     def get_preset_credentials(self) -> Tuple[Optional[str], Optional[str]]:
         """Get Preset API credentials."""
-        token = get_env_var(
-            "preset_api_token") or self.global_config.preset_api_token
-        secret = get_env_var(
-            "preset_api_secret") or self.global_config.preset_api_secret
+        token = get_env_var("preset_api_token") or self.global_config.preset_api_token
+        secret = get_env_var("preset_api_secret") or self.global_config.preset_api_secret
         return token, secret
 
     def get_current_superset_instance_config(self) -> Optional[SupersetInstanceConfig]:
@@ -293,7 +289,7 @@ class SupContext:
                 url=env_url,
                 username=env_username,
                 password=env_password,
-                auth_method="username_password"
+                auth_method="username_password",
             )
 
         # Fallback to configured instances
