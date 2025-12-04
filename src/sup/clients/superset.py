@@ -7,13 +7,9 @@ Provides database and SQL execution functionality.
 from sup.output.styles import COLORS, EMOJIS, RICH_STYLES
 from sup.output.console import console
 from sup.config.settings import SupContext
-from sup.auth.standalone import login_and_get_token
 from sup.auth.preset import SupPresetAuth
-from preset_cli.auth.superset import SupersetJWTAuth
 from preset_cli.auth.factory import create_superset_auth
 from typing import Any, Dict, List, Optional
-
-from yarl import URL
 
 # Removed: from rich.console import Console
 from rich.table import Table
