@@ -351,6 +351,16 @@ def auth_setup():
                     f"export SUP_SUPERSET_PASSWORD='{password}'",
                     style=RICH_STYLES["data"],
                 )
+            else:
+                console.print(
+                    "You can set credentials manually with these environment variables:",
+                    style=RICH_STYLES["info"],
+                )
+                console.print(
+                    "SUP_SUPERSET_INSTANCE_URL=your_instance_url", style=RICH_STYLES["data"]
+                )
+                console.print("SUP_SUPERSET_USERNAME=your_username", style=RICH_STYLES["data"])
+                console.print("SUP_SUPERSET_PASSWORD=your_password", style=RICH_STYLES["data"])
 
             console.print()
             console.print(f"{EMOJIS['rocket']} Setup complete!", style=RICH_STYLES["success"])
