@@ -254,7 +254,6 @@ def auth_setup():
     Guides through Preset API token setup or Superset instance configuration.
     """
     from sup.auth.preset import test_auth_credentials
-    from sup.auth.standalone import test_superset_auth
     from sup.config.settings import SupContext, SupersetInstanceConfig
 
     console.print(f"{EMOJIS['lock']} Authentication Setup", style=RICH_STYLES["header"])
@@ -302,73 +301,62 @@ def auth_setup():
             console.print(f"{EMOJIS['error']} Password is required", style=RICH_STYLES["error"])
             return
 
-        # Test connection
-        console.print(f"{EMOJIS['loading']} Testing connection...", style=RICH_STYLES["info"])
-        if test_superset_auth(instance_url, username, password):
+        # Save configuration
+        console.print()
+        console.print(
+            "How would you like to store these credentials?", style=RICH_STYLES["header"]
+        )
+        console.print(
+            "1. [bold]Global config[/] (~/.sup/config.yml) - recommended for personal use"
+        )
+        console.print("2. [bold]Environment variables[/] - more secure, great for CI/CD")
+        console.print("3. [bold]Skip storage[/]")
+
+        choice = input("Choose an option [1-3]: ").strip()
+
+        if choice == "1":
+            new_instance = SupersetInstanceConfig(
+                url=instance_url,
+                username=username,
+                password=password,
+                auth_method="username_password",
+            )
+            ctx.global_config.superset_instances[instance_name] = new_instance
+            ctx.global_config.current_superset_instance = instance_name
+            ctx.global_config.save_to_file()
             console.print(
-                f"{EMOJIS['success']} Connection successful!", style=RICH_STYLES["success"]
+                f"{EMOJIS['success']} Credentials saved to ~/.sup/config.yml",
+                style=RICH_STYLES["success"],
             )
 
-            # Save configuration
-            console.print()
+        elif choice == "2":
+            console.print("Add these to your shell profile:", style=RICH_STYLES["info"])
             console.print(
-                "How would you like to store these credentials?", style=RICH_STYLES["header"]
+                f"export SUP_SUPERSET_INSTANCE_URL='{instance_url}'",
+                style=RICH_STYLES["data"],
             )
             console.print(
-                "1. [bold]Global config[/] (~/.sup/config.yml) - recommended for personal use"
+                f"export SUP_SUPERSET_USERNAME='{username}'",
+                style=RICH_STYLES["data"],
             )
-            console.print("2. [bold]Environment variables[/] - more secure, great for CI/CD")
-            console.print("3. [bold]Skip storage[/]")
-
-            choice = input("Choose an option [1-3]: ").strip()
-
-            if choice == "1":
-                new_instance = SupersetInstanceConfig(
-                    url=instance_url,
-                    username=username,
-                    password=password,
-                    auth_method="username_password",
-                )
-                ctx.global_config.superset_instances[instance_name] = new_instance
-                ctx.global_config.current_superset_instance = instance_name
-                ctx.global_config.save_to_file()
-                console.print(
-                    f"{EMOJIS['success']} Credentials saved to ~/.sup/config.yml",
-                    style=RICH_STYLES["success"],
-                )
-
-            elif choice == "2":
-                console.print("Add these to your shell profile:", style=RICH_STYLES["info"])
-                console.print(
-                    f"export SUP_SUPERSET_INSTANCE_URL='{instance_url}'",
-                    style=RICH_STYLES["data"],
-                )
-                console.print(
-                    f"export SUP_SUPERSET_USERNAME='{username}'",
-                    style=RICH_STYLES["data"],
-                )
-                console.print(
-                    f"export SUP_SUPERSET_PASSWORD='{password}'",
-                    style=RICH_STYLES["data"],
-                )
-            else:
-                console.print(
-                    "You can set credentials manually with these environment variables:",
-                    style=RICH_STYLES["info"],
-                )
-                console.print(
-                    "SUP_SUPERSET_INSTANCE_URL=your_instance_url", style=RICH_STYLES["data"]
-                )
-                console.print("SUP_SUPERSET_USERNAME=your_username", style=RICH_STYLES["data"])
-                console.print("SUP_SUPERSET_PASSWORD=your_password", style=RICH_STYLES["data"])
-
-            console.print()
-            console.print(f"{EMOJIS['rocket']} Setup complete!", style=RICH_STYLES["success"])
+            console.print(
+                f"export SUP_SUPERSET_PASSWORD='{password}'",
+                style=RICH_STYLES["data"],
+            )
         else:
             console.print(
-                f"{EMOJIS['error']} Connection failed. Please check your credentials.",
-                style=RICH_STYLES["error"],
+                "You can set credentials manually with these environment variables:",
+                style=RICH_STYLES["info"],
             )
+            console.print(
+                "SUP_SUPERSET_INSTANCE_URL=your_instance_url", style=RICH_STYLES["data"]
+            )
+            console.print("SUP_SUPERSET_USERNAME=your_username", style=RICH_STYLES["data"])
+            console.print("SUP_SUPERSET_PASSWORD=your_password", style=RICH_STYLES["data"])
+
+        console.print()
+        console.print(f"{EMOJIS['rocket']} Setup complete!", style=RICH_STYLES["success"])
+
         return
 
     # Preset Setup (Existing Logic)
