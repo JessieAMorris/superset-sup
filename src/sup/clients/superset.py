@@ -4,16 +4,18 @@ Superset client wrapper for sup CLI.
 Provides database and SQL execution functionality.
 """
 
+from sup.output.styles import COLORS, EMOJIS, RICH_STYLES
+from sup.output.console import console
+from sup.config.settings import SupContext
+from sup.auth.preset import SupPresetAuth
+from preset_cli.auth.factory import create_superset_auth
 from typing import Any, Dict, List, Optional
 
 # Removed: from rich.console import Console
 from rich.table import Table
 
 from preset_cli.api.clients.superset import SupersetClient
-from sup.auth.preset import SupPresetAuth
-from sup.config.settings import SupContext
-from sup.output.console import console
-from sup.output.styles import COLORS, EMOJIS, RICH_STYLES
+from preset_cli.auth.main import Auth
 
 
 class SupSupersetClient:
@@ -21,7 +23,7 @@ class SupSupersetClient:
     Superset client wrapper with sup-specific functionality.
     """
 
-    def __init__(self, workspace_url: str, auth: SupPresetAuth):
+    def __init__(self, workspace_url: str, auth: Auth):
         self.workspace_url = workspace_url
         self.auth = auth
         self.client = SupersetClient(workspace_url, auth)
@@ -32,7 +34,19 @@ class SupSupersetClient:
         ctx: SupContext,
         workspace_id: Optional[int] = None,
     ) -> "SupSupersetClient":
-        """Create Superset client from sup configuration context."""
+        """
+        Create Superset client from sup configuration context.
+
+        Supports both Standalone Superset and Preset.io workspaces.
+        """
+        # 1. Check for Standalone Superset configuration first
+        standalone_config = ctx.get_current_superset_instance_config()
+
+        if standalone_config:
+            auth = create_superset_auth(standalone_config)
+            return cls(standalone_config.url, auth)
+
+        # 2. Fallback to Preset.io Workspace logic
         # Get workspace ID from context if not provided
         if workspace_id is None:
             workspace_id = ctx.get_workspace_id()
@@ -45,6 +59,10 @@ class SupSupersetClient:
             console.print(
                 "💡 Run [bold]sup workspace list[/] and [bold]sup workspace use <ID>[/]",
                 style=RICH_STYLES["info"],
+            )
+            console.print(
+                "   Or configure standalone Superset with [bold]sup config auth[/]",
+                style=RICH_STYLES["dim"],
             )
             raise ValueError("No workspace configured")
 

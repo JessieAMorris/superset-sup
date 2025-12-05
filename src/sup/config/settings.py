@@ -68,12 +68,55 @@ class SupersetInstanceConfig(BaseModel):
     url: str
     auth_method: str = Field(
         default="username_password",
+        description="Authentication method: username_password, jwt, or oauth",
         pattern="^(username_password|jwt|oauth)$",
     )
-    username: Optional[str] = None
-    password: Optional[str] = None
-    jwt_token: Optional[str] = None
-    # Future: oauth_client_id, custom_headers, etc.
+
+    # Username/password authentication (basic Superset auth)
+    username: Optional[str] = Field(
+        default=None,
+        description="Username for Superset username/password authentication",
+    )
+    password: Optional[str] = Field(
+        default=None,
+        description="Password for Superset username/password authentication",
+    )
+
+    # JWT token authentication
+    jwt_token: Optional[str] = Field(
+        default=None,
+        description="Pre-generated JWT token for Superset JWT authentication",
+    )
+
+    # OAuth2/OIDC authentication (NEW)
+    oauth_token_url: Optional[str] = Field(
+        default=None,
+        description="OAuth2 token endpoint URL (e.g., https://auth.example.com/oauth2/token)",
+    )
+    oauth_client_id: Optional[str] = Field(
+        default=None,
+        description="OAuth2 client ID registered with OIDC provider",
+    )
+    oauth_client_secret: Optional[str] = Field(
+        default=None,
+        description="OAuth2 client secret. Use environment variables: ${ENV:SUPERSET_OAUTH_SECRET}",
+    )
+    oauth_username: Optional[str] = Field(
+        default=None,
+        description="Service account username for OAuth2 resource owner password grant",
+    )
+    oauth_password: Optional[str] = Field(
+        default=None,
+        description="Service account password. Use environment variables: ${ENV:SERVICE_PASSWORD}",
+    )
+    oauth_scope: str = Field(
+        default="openid profile email roles",
+        description="OAuth2 scopes to request (space-separated)",
+    )
+    oauth_token_type: str = Field(
+        default="Bearer",
+        description="Token type in Authorization header (usually Bearer)",
+    )
 
 
 class SupGlobalConfig(BaseSettings):
@@ -87,6 +130,7 @@ class SupGlobalConfig(BaseSettings):
 
     # Superset Authentication (Extensible Design)
     superset_instances: Dict[str, SupersetInstanceConfig] = Field(default_factory=dict)
+    current_superset_instance: Optional[str] = None
 
     # Global preferences
     output_format: OutputFormat = OutputFormat.table
@@ -150,7 +194,8 @@ class SupProjectState(BaseSettings):
     # Current context
     current_workspace_id: Optional[int] = None
     current_workspace_url: Optional[str] = None
-    current_workspace_hostname: Optional[str] = None  # Cache hostname for efficiency
+    # Cache hostname for efficiency
+    current_workspace_hostname: Optional[str] = None
     current_database_id: Optional[int] = None
     current_team: Optional[str] = None
 
@@ -230,6 +275,30 @@ class SupContext:
         token = get_env_var("preset_api_token") or self.global_config.preset_api_token
         secret = get_env_var("preset_api_secret") or self.global_config.preset_api_secret
         return token, secret
+
+    def get_current_superset_instance_config(self) -> Optional[SupersetInstanceConfig]:
+        """Get configuration for the current standalone Superset instance."""
+        # Check environment variables first for a "temporary" standalone config
+        env_url = get_env_var("superset_instance_url")
+        env_username = get_env_var("superset_username")
+        env_password = get_env_var("superset_password")
+
+        if env_url:
+            # Create a temporary config object from env vars
+            return SupersetInstanceConfig(
+                url=env_url,
+                username=env_username,
+                password=env_password,
+                auth_method="username_password",
+            )
+
+        # Fallback to configured instances
+        env_instance_name = get_env_var("superset_instance")
+        instance_name = env_instance_name or self.global_config.current_superset_instance
+        if instance_name and instance_name in self.global_config.superset_instances:
+            return self.global_config.superset_instances[instance_name]
+
+        return None
 
     def get_output_format(
         self,
