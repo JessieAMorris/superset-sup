@@ -33,12 +33,22 @@ class SupSupersetClient:
         cls,
         ctx: SupContext,
         workspace_id: Optional[int] = None,
+        instance_name: Optional[str] = None,
     ) -> "SupSupersetClient":
         """
         Create Superset client from sup configuration context.
 
         Supports both Standalone Superset and Preset.io workspaces.
         """
+        # 0. Check if specific instance is requested
+        if instance_name:
+            if instance_name in ctx.global_config.superset_instances:
+                config = ctx.global_config.superset_instances[instance_name]
+                auth = create_superset_auth(config)
+                return cls(config.url, auth)
+            else:
+                raise ValueError(f"Superset instance '{instance_name}' not found in configuration")
+
         # 1. Check for Standalone Superset configuration first
         standalone_config = ctx.get_current_superset_instance_config()
 

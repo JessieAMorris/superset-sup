@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
 import yaml
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, model_validator, validator
 
 
 class AssetSelection(BaseModel):
@@ -69,8 +69,24 @@ class AssetTypes(BaseModel):
 class SourceConfig(BaseModel):
     """Configuration for the source workspace to pull from."""
 
-    workspace_id: int = Field(description="Source workspace ID to pull assets from")
+    workspace_id: Optional[int] = Field(
+        default=None,
+        description="Source workspace ID to pull assets from",
+    )
+    instance: Optional[str] = Field(
+        default=None,
+        description="Source Superset instance name",
+    )
     assets: AssetTypes = Field(description="Asset types and selection criteria")
+
+    @model_validator(mode="after")
+    def validate_source_target(self) -> "SourceConfig":
+        """Ensure either workspace_id or instance is specified."""
+        if not self.workspace_id and not self.instance:
+            raise ValueError("Either workspace_id or instance must be specified for source")
+        if self.workspace_id and self.instance:
+            raise ValueError("Cannot specify both workspace_id and instance for source")
+        return self
 
 
 class TargetDefaults(BaseModel):
@@ -93,7 +109,14 @@ class TargetDefaults(BaseModel):
 class TargetConfig(BaseModel):
     """Configuration for a specific target workspace."""
 
-    workspace_id: int = Field(description="Target workspace ID to push assets to")
+    workspace_id: Optional[int] = Field(
+        default=None,
+        description="Target workspace ID to push assets to",
+    )
+    instance: Optional[str] = Field(
+        default=None,
+        description="Target Superset instance name",
+    )
     name: Optional[str] = Field(default=None, description="Human-readable name for this target")
     overwrite: Optional[bool] = Field(
         default=None,
@@ -103,6 +126,15 @@ class TargetConfig(BaseModel):
         default_factory=dict,
         description="Target-specific Jinja template variables",
     )
+
+    @model_validator(mode="after")
+    def validate_target(self) -> "TargetConfig":
+        """Ensure either workspace_id or instance is specified."""
+        if not self.workspace_id and not self.instance:
+            raise ValueError("Either workspace_id or instance must be specified for target")
+        if self.workspace_id and self.instance:
+            raise ValueError("Cannot specify both workspace_id and instance for target")
+        return self
 
     def get_effective_overwrite(self, defaults: TargetDefaults) -> bool:
         """Get the effective overwrite setting, considering defaults."""
@@ -134,17 +166,24 @@ class SyncConfig(BaseModel):
         return v
 
     @validator("targets")
-    def validate_unique_workspace_ids(cls, v):
-        """Ensure target workspace IDs are unique."""
-        workspace_ids = [target.workspace_id for target in v]
+    def validate_unique_targets(cls, v):
+        """Ensure target workspace IDs and instances are unique."""
+        workspace_ids = [t.workspace_id for t in v if t.workspace_id]
+        instances = [t.instance for t in v if t.instance]
+
         if len(workspace_ids) != len(set(workspace_ids)):
             raise ValueError("Target workspace IDs must be unique")
+        if len(instances) != len(set(instances)):
+            raise ValueError("Target instances must be unique")
         return v
 
     def get_target_by_name(self, name: str) -> Optional[TargetConfig]:
         """Get a target configuration by name."""
         for target in self.targets:
             if target.name == name:
+                return target
+            # Also match instance name as a fallback for name
+            if target.instance == name:
                 return target
         return None
 
@@ -206,17 +245,27 @@ class SyncConfig(BaseModel):
     @classmethod
     def create_example(
         cls,
-        source_workspace_id: int,
-        target_workspace_ids: List[int],
+        source: str,  # Can be workspace_id (int) or instance name (str)
+        targets: List[str],  # List of workspace_ids or instance names
     ) -> "SyncConfig":
         """Create an example sync configuration."""
 
+        # Helper to parse source/target
+        def parse_target(val: str) -> dict:
+            try:
+                return {"workspace_id": int(val)}
+            except ValueError:
+                return {"instance": val}
+
+        source_config = parse_target(source)
+        target_configs = [parse_target(t) for t in targets]
+
         # Create targets with basic configuration
-        targets = []
-        for i, workspace_id in enumerate(target_workspace_ids):
-            targets.append(
+        target_objs = []
+        for i, t_conf in enumerate(target_configs):
+            target_objs.append(
                 TargetConfig(
-                    workspace_id=workspace_id,
+                    **t_conf,
                     name=f"target_{i + 1}",
                     jinja_context={
                         "environment": "production" if i == 0 else "staging",
@@ -227,7 +276,7 @@ class SyncConfig(BaseModel):
 
         return cls(
             source=SourceConfig(
-                workspace_id=source_workspace_id,
+                **source_config,
                 assets=AssetTypes(
                     charts=AssetSelection(selection="all", include_dependencies=True),
                     dashboards=AssetSelection(selection="all", include_dependencies=True),
@@ -237,7 +286,7 @@ class SyncConfig(BaseModel):
                 overwrite=False,
                 jinja_context={"company": "Default Company", "region": "us-east-1"},
             ),
-            targets=targets,
+            targets=target_objs,
         )
 
 

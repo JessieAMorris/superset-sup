@@ -188,13 +188,13 @@ def create_sync(
         str,
         typer.Argument(help="Path to create new sync folder"),
     ],
-    source_workspace_id: Annotated[
-        int,
-        typer.Option("--source", help="Source workspace ID"),
-    ],
-    target_workspace_ids: Annotated[
+    source: Annotated[
         str,
-        typer.Option("--targets", help="Target workspace IDs (comma-separated)"),
+        typer.Option("--source", help="Source workspace ID or instance name"),
+    ],
+    targets: Annotated[
+        str,
+        typer.Option("--targets", help="Target workspace IDs or instance names (comma-separated)"),
     ],
     force: Annotated[
         bool,
@@ -209,7 +209,7 @@ def create_sync(
 
     Examples:
         sup sync create ./my_sync --source 123 --targets 456,789
-        sup sync create ./customer_sync --source 100 --targets 200,300,400
+        sup sync create ./customer_sync --source production --targets staging
     """
     sync_path = Path(sync_folder).resolve()
 
@@ -222,21 +222,14 @@ def create_sync(
         console.print("Use --force to overwrite")
         raise typer.Exit(1)
 
-    # Parse target workspace IDs
-    try:
-        target_ids = [int(id_.strip()) for id_ in target_workspace_ids.split(",")]
-    except ValueError as e:
-        console.print(
-            f"{EMOJIS['error']} Invalid target workspace IDs: {e}",
-            style=RICH_STYLES["error"],
-        )
-        raise typer.Exit(1)
+    # Parse targets
+    target_list = [t.strip() for t in targets.split(",")]
 
     try:
         # Create sync configuration
         sync_config = SyncConfig.create_example(
-            source_workspace_id=source_workspace_id,
-            target_workspace_ids=target_ids,
+            source=source,
+            targets=target_list,
         )
 
         # Create folder structure
@@ -357,7 +350,10 @@ def display_sync_summary(
 
     # Source info
     console.print("\n📤 Source:")
-    console.print(f"   Workspace ID: {sync_config.source.workspace_id}")
+    if sync_config.source.workspace_id:
+        console.print(f"   Workspace ID: {sync_config.source.workspace_id}")
+    else:
+        console.print(f"   Instance: {sync_config.source.instance}")
 
     # Asset selection summary
     assets = sync_config.source.assets
@@ -377,15 +373,21 @@ def display_sync_summary(
     console.print(f"\n📥 Targets ({len(targets)}):")
     for target in targets:
         name_display = f" ({target.name})" if target.name else ""
+        identifier = target.workspace_id if target.workspace_id else f"Instance: {target.instance}"
         overwrite = target.get_effective_overwrite(sync_config.target_defaults)
-        console.print(f"   • {target.workspace_id}{name_display} [overwrite: {overwrite}]")
+        console.print(f"   • {identifier}{name_display} [overwrite: {overwrite}]")
 
 
 def execute_pull(sync_config: SyncConfig, sync_path: Path, dry_run: bool, porcelain: bool) -> None:
     """Execute the pull operation from source workspace."""
     if not porcelain:
+        identifier = (
+            sync_config.source.workspace_id
+            if sync_config.source.workspace_id
+            else f"Instance: {sync_config.source.instance}"
+        )
         console.print(
-            f"\n{EMOJIS['download']} Pulling from workspace {sync_config.source.workspace_id}...",
+            f"\n{EMOJIS['download']} Pulling from {identifier}...",
             style=RICH_STYLES["info"],
         )
 
@@ -415,7 +417,11 @@ def execute_pull(sync_config: SyncConfig, sync_path: Path, dry_run: bool, porcel
     try:
         # Get current context and client
         ctx = SupContext()
-        client = SupSupersetClient.from_context(ctx, sync_config.source.workspace_id)
+        client = SupSupersetClient.from_context(
+            ctx,
+            workspace_id=sync_config.source.workspace_id,
+            instance_name=sync_config.source.instance,
+        )
 
         # Use the sync config's assets folder method
         assets_path = sync_config.assets_folder(sync_path)
@@ -509,10 +515,13 @@ def execute_push(
 
     for target in targets:
         name_display = f" ({target.name})" if target.name else ""
+        identifier = (
+            target.workspace_id if target.workspace_id else f"Instance: {target.instance}"
+        )
 
         if not porcelain:
             console.print(
-                f"\n{EMOJIS['upload']} Pushing to workspace {target.workspace_id}{name_display}...",
+                f"\n{EMOJIS['upload']} Pushing to {identifier}{name_display}...",
                 style=RICH_STYLES["info"],
             )
 
@@ -526,8 +535,18 @@ def execute_push(
             # Get client for target workspace
             ctx = SupContext()
             if not porcelain:
-                console.print(f"   🎯 Target workspace ID from config: {target.workspace_id}")
-            client = SupSupersetClient.from_context(ctx, target.workspace_id)
+                identifier = (
+                    target.workspace_id
+                    if target.workspace_id
+                    else f"Instance: {target.instance}"
+                )
+                console.print(f"   🎯 Target: {identifier}")
+
+            client = SupSupersetClient.from_context(
+                ctx,
+                workspace_id=target.workspace_id,
+                instance_name=target.instance,
+            )
 
             # Verify we're using the right workspace
             if not porcelain:
@@ -659,9 +678,14 @@ def execute_push(
                             console.print(output)
 
                     if not porcelain:
+                        identifier = (
+                            target.workspace_id
+                            if target.workspace_id
+                            else f"Instance: {target.instance}"
+                        )
                         success_message = (
                             f"   {EMOJIS['success']} Pushed {len(configs)} assets to "
-                            f"workspace {target.workspace_id}"
+                            f"{identifier}"
                         )
                         console.print(success_message, style=RICH_STYLES["success"])
                 except Exception as import_error:
@@ -686,8 +710,11 @@ def execute_push(
 
         except Exception as e:
             if not porcelain:
+                identifier = (
+                    target.workspace_id if target.workspace_id else f"Instance: {target.instance}"
+                )
                 console.print(
-                    f"{EMOJIS['error']} Push to {target.workspace_id} failed: {e}",
+                    f"{EMOJIS['error']} Push to {identifier} failed: {e}",
                     style=RICH_STYLES["error"],
                 )
             raise
