@@ -156,11 +156,24 @@ def export_resource(  # pylint: disable=too-many-arguments, too-many-locals
             target.parent.mkdir(parents=True, exist_ok=True)
 
         # escape any pre-existing Jinja2 templates
-        if not disable_jinja_escaping:
+        asset_content = None
+        if not disable_jinja_escaping or (resource_name == "dashboard" and file_name.startswith("dashboards/")):
             asset_content = yaml.load(file_contents, Loader=yaml.SafeLoader)
+
+        if resource_name == "dashboard" and file_name.startswith("dashboards/") and asset_content:
+            try:
+                embedded = client.get_dashboard_embedded(asset_content["uuid"])
+                if embedded:
+                    asset_content["_embedded"] = {"allowed_domains": embedded["allowed_domains"]}
+            except Exception:  # pylint: disable=broad-except
+                # dashboard might not have embedded config or user might not have permissions
+                pass
+
+        if not disable_jinja_escaping and asset_content:
             for key, value in asset_content.items():
                 asset_content[key] = traverse_data(value, handle_string)
 
+        if asset_content:
             file_contents = yaml.dump(asset_content, sort_keys=False)
 
         newline = get_newline_char(force_unix_eol)

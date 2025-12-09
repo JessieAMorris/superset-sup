@@ -696,6 +696,44 @@ class SupersetClient:  # pylint: disable=too-many-public-methods
         """
         return self.update_resource("dashboard", dashboard_id, **kwargs)
 
+    def get_dashboard_embedded(
+        self,
+        dashboard_id_or_slug: Union[int, str],
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get the embedded configuration for a dashboard.
+        """
+        url = self.baseurl / "api/v1/dashboard" / str(dashboard_id_or_slug) / "embedded"
+        _logger.debug("GET %s", url)
+        response = self.session.get(url)
+        if response.status_code == 404:
+            return None
+        validate_response(response)
+        return response.json()["result"]
+
+    def set_dashboard_embedded(
+        self,
+        dashboard_id_or_slug: Union[int, str],
+        allowed_domains: List[str],
+    ) -> Dict[str, Any]:
+        """
+        Set the embedded configuration for a dashboard.
+        """
+        current_config = self.get_dashboard_embedded(dashboard_id_or_slug)
+        url = self.baseurl / "api/v1/dashboard" / str(dashboard_id_or_slug) / "embedded"
+
+        data = {"allowed_domains": allowed_domains}
+
+        if current_config:
+            _logger.debug("PUT %s\n%s", url, json.dumps(data, indent=4))
+            response = self.session.put(url, json=data)
+        else:
+            _logger.debug("POST %s\n%s", url, json.dumps(data, indent=4))
+            response = self.session.post(url, json=data)
+
+        validate_response(response)
+        return response.json()["result"]
+
     def export_zip(self, resource_name: str, ids: List[int]) -> BytesIO:
         """
         Export one or more of a resource.

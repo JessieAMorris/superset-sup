@@ -3802,3 +3802,79 @@ def test_get_database_connection(requests_mock: Mocker) -> None:
 
     response = client.get_database(1)
     assert response["sqlalchemy_uri"] == "preset://"
+
+
+def test_get_dashboard_embedded(requests_mock: Mocker) -> None:
+    """
+    Test the ``get_dashboard_embedded`` method.
+    """
+    requests_mock.get(
+        "https://superset.example.org/api/v1/dashboard/1/embedded",
+        json={"result": {"allowed_domains": ["example.com"]}},
+    )
+
+    auth = Auth()
+    client = SupersetClient("https://superset.example.org/", auth)
+
+    response = client.get_dashboard_embedded(1)
+    assert response == {"allowed_domains": ["example.com"]}
+    assert requests_mock.last_request.headers["Referer"] == "https://superset.example.org/"
+
+
+def test_get_dashboard_embedded_not_found(requests_mock: Mocker) -> None:
+    """
+    Test the ``get_dashboard_embedded`` method when not found.
+    """
+    requests_mock.get(
+        "https://superset.example.org/api/v1/dashboard/1/embedded",
+        status_code=404,
+    )
+
+    auth = Auth()
+    client = SupersetClient("https://superset.example.org/", auth)
+
+    response = client.get_dashboard_embedded(1)
+    assert response is None
+
+
+def test_set_dashboard_embedded_create(requests_mock: Mocker) -> None:
+    """
+    Test the ``set_dashboard_embedded`` method (create).
+    """
+    requests_mock.get(
+        "https://superset.example.org/api/v1/dashboard/1/embedded",
+        status_code=404,
+    )
+    requests_mock.post(
+        "https://superset.example.org/api/v1/dashboard/1/embedded",
+        json={"result": {"allowed_domains": ["example.com"]}},
+    )
+
+    auth = Auth()
+    client = SupersetClient("https://superset.example.org/", auth)
+
+    response = client.set_dashboard_embedded(1, ["example.com"])
+    assert response == {"allowed_domains": ["example.com"]}
+    assert requests_mock.last_request.json() == {"allowed_domains": ["example.com"]}
+
+
+def test_set_dashboard_embedded_update(requests_mock: Mocker) -> None:
+    """
+    Test the ``set_dashboard_embedded`` method (update).
+    """
+    requests_mock.get(
+        "https://superset.example.org/api/v1/dashboard/1/embedded",
+        json={"result": {"allowed_domains": ["old.com"]}},
+    )
+    requests_mock.put(
+        "https://superset.example.org/api/v1/dashboard/1/embedded",
+        json={"result": {"allowed_domains": ["example.com"]}},
+    )
+
+    auth = Auth()
+    client = SupersetClient("https://superset.example.org/", auth)
+
+    response = client.set_dashboard_embedded(1, ["example.com"])
+    assert response == {"allowed_domains": ["example.com"]}
+    assert requests_mock.last_request.method == "PUT"
+    assert requests_mock.last_request.json() == {"allowed_domains": ["example.com"]}

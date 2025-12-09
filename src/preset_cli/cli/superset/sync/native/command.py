@@ -384,8 +384,26 @@ def import_resources_individually(  # pylint: disable=too-many-locals
 
                     _logger.info("Importing %s", path.relative_to("bundle"))
 
+                    embedded_config = None
+                    if resource_name == "dashboards" and "_embedded" in config:
+                        embedded_config = config.pop("_embedded")
+
                     contents = {str(k): yaml.dump(v) for k, v in asset_configs.items()}
                     import_resources(contents, client, overwrite, asset_type)
+
+                    if embedded_config:
+                        try:
+                            client.set_dashboard_embedded(
+                                config["uuid"],
+                                embedded_config["allowed_domains"],
+                            )
+                            _logger.info("Synced embedded config for dashboard %s", config["uuid"])
+                        except Exception as ex:
+                            _logger.warning(
+                                "Failed to sync embedded config for dashboard %s: %s",
+                                config["uuid"],
+                                ex,
+                            )
                 except Exception:  # pylint: disable=broad-except
                     if not continue_on_error:
                         raise
